@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+edge-tts
+rvc-python
+torch
+soundfile
+numpy
+pydub
+python-multipart

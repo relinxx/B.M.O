@@ -1,0 +1,11 @@
+Model Information:
+* title:	BMO
+* source:	https://sketchfab.com/3d-models/bmo-bab0bf1991d04757954872507c5b1595
+* author:	Drawnah (https://sketchfab.com/EzequielMunoz)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "BMO" (https://sketchfab.com/3d-models/bmo-bab0bf1991d04757954872507c5b1595) by Drawnah (https://sketchfab.com/EzequielMunoz) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

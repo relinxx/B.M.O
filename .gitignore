@@ -51,6 +51,8 @@ coverage.xml
 .pytest_cache/
 cover/
 
+frontend/package-lock.json
+frontend/node_modules/*
 # Translations
 *.mo
 *.pot
@@ -130,7 +132,6 @@ __pypackages__/
 # Celery stuff
 celerybeat-schedule
 celerybeat.pid
-
 # SageMath parsed files
 *.sage.py
 
