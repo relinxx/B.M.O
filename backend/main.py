@@ -17,6 +17,7 @@ else:
 
 from api.think import router as think_router
 from api.speak import router as speak_router
+from api.stt import router as stt_router
 # Temporarily disable STT due to Python 3.12 compatibility issues
 # from api.stt import router as stt_router
 
@@ -41,9 +42,9 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(think_router, prefix="/api", tags=["thinking"])
-app.include_router(speak_router, prefix="/api", tags=["speaking"])
-# app.include_router(stt_router, prefix="/api", tags=["speech-to-text"])
+app.include_router(think_router, prefix="/api")
+app.include_router(speak_router, prefix="/api")
+app.include_router(stt_router, prefix="/api", tags=["speech-to-text"])
 
 @app.get("/")
 async def root():

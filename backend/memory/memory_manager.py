@@ -49,15 +49,15 @@ class MemoryManager:
                     else:
                         metadata[f"context_{key}"] = str(value)
             
-            # Store user input
-            await self.collection.add(
+            # Store user input (synchronous ChromaDB call)
+            self.collection.add(
                 documents=[user_input],
                 metadatas=[metadata],
                 ids=[f"{conversation_id}_user_{int(time.time())}"]
             )
             
-            # Store BMO response
-            await self.collection.add(
+            # Store BMO response (synchronous ChromaDB call)
+            self.collection.add(
                 documents=[bmo_response],
                 metadatas=[metadata],
                 ids=[f"{conversation_id}_bmo_{int(time.time())}"]
@@ -65,7 +65,8 @@ class MemoryManager:
             
         except Exception as e:
             logger.error(f"Error storing interaction: {str(e)}")
-            raise Exception(f"Failed to store interaction: {str(e)}")
+            # Don't raise exception, just log it
+            pass
     
     async def get_relevant_memories(self, query: str, limit: int = 3) -> List[str]:
         """

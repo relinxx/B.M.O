@@ -823,7 +823,7 @@ const api = {
     // Speech-to-Text
     async speechToText (audioBlob) {
         const formData = new FormData();
-        formData.append('audio_file', audioBlob, 'recording.wav');
+        formData.append('audio_file', audioBlob, 'recording.webm');
         const response = await fetchWithTimeout(`${API_BASE_URL}/stt`, {
             method: 'POST',
             body: formData
@@ -981,15 +981,20 @@ function Controls() {
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: true
             });
-            const mediaRecorder = new MediaRecorder(stream);
+            const preferredMimeType = 'audio/webm;codecs=opus';
+            const options = MediaRecorder.isTypeSupported(preferredMimeType) ? {
+                mimeType: preferredMimeType
+            } : undefined;
+            const mediaRecorder = new MediaRecorder(stream, options);
             mediaRecorderRef.current = mediaRecorder;
             audioChunksRef.current = [];
             mediaRecorder.ondataavailable = (event)=>{
                 audioChunksRef.current.push(event.data);
             };
             mediaRecorder.onstop = async ()=>{
+                const mimeType = mediaRecorder.mimeType || 'audio/webm';
                 const audioBlob = new Blob(audioChunksRef.current, {
-                    type: 'audio/wav'
+                    type: mimeType
                 });
                 await processAudio(audioBlob);
                 stream.getTracks().forEach((track)=>track.stop());
@@ -1119,7 +1124,7 @@ function Controls() {
                 children: isRecording ? '🛑' : '🎤'
             }, void 0, false, {
                 fileName: "[project]/components/Controls.jsx",
-                lineNumber: 172,
+                lineNumber: 177,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -1150,7 +1155,7 @@ function Controls() {
                         }
                     }, void 0, false, {
                         fileName: "[project]/components/Controls.jsx",
-                        lineNumber: 200,
+                        lineNumber: 205,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1168,13 +1173,13 @@ function Controls() {
                         children: "Send"
                     }, void 0, false, {
                         fileName: "[project]/components/Controls.jsx",
-                        lineNumber: 216,
+                        lineNumber: 221,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/components/Controls.jsx",
-                lineNumber: 192,
+                lineNumber: 197,
                 columnNumber: 7
             }, this),
             lastResponse && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1196,7 +1201,7 @@ function Controls() {
                 ]
             }, void 0, true, {
                 fileName: "[project]/components/Controls.jsx",
-                lineNumber: 235,
+                lineNumber: 240,
                 columnNumber: 9
             }, this),
             error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1213,7 +1218,7 @@ function Controls() {
                 children: error
             }, void 0, false, {
                 fileName: "[project]/components/Controls.jsx",
-                lineNumber: 252,
+                lineNumber: 257,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1228,13 +1233,13 @@ function Controls() {
                 children: isRecording ? '🎙️ Listening...' : isLoading ? '🤔 Thinking...' : '💬 Ready'
             }, void 0, false, {
                 fileName: "[project]/components/Controls.jsx",
-                lineNumber: 267,
+                lineNumber: 272,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/components/Controls.jsx",
-        lineNumber: 161,
+        lineNumber: 166,
         columnNumber: 5
     }, this);
 }

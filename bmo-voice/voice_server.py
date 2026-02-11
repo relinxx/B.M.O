@@ -3,6 +3,7 @@ import asyncio
 import uuid
 import logging
 from concurrent.futures import ThreadPoolExecutor
+import io
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
@@ -26,7 +27,6 @@ INDEX_PATH = os.path.join(MODELS_DIR, "bmo.index")
 LICENSE_PATH = os.path.join(MODELS_DIR, "LICENSE.txt")
 
 TMP_DIR = "tmp_audio"
-os.makedirs(TMP_DIR, exist_ok=True)
 
 BASE_VOICE = "en-US-JennyNeural"  # Use local voice instead of cloud-based
 PITCH = "+15Hz"
@@ -121,6 +121,34 @@ async def edge_tts_generate(text: str, mp3_path: str):
     )
     await communicate.save(mp3_path)
 
+async def generate_voice_in_memory(text: str) -> bytes:
+    """
+    Generate audio directly in memory without saving to disk
+    """
+    try:
+        # Use a simple approach - generate TTS data directly
+        communicate = edge_tts.Communicate(
+            text=text,
+            voice=BASE_VOICE,
+            pitch=PITCH,
+            rate=RATE,
+            proxy=None  # Disable proxy to avoid network issues
+        )
+        
+        # Get audio data as bytes
+        audio_data = []
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_data.append(chunk["data"])
+        
+        # Combine all audio chunks
+        return b"".join(audio_data)
+        
+    except Exception as e:
+        logger.error(f"Error generating in-memory audio: {str(e)}")
+        # Return empty audio if generation fails
+        return b""
+
 def mp3_to_wav(mp3_path: str, wav_path: str):
     try:
         audio = AudioSegment.from_mp3(mp3_path)
@@ -181,6 +209,35 @@ async def speak(req: SpeakRequest):
     loop = asyncio.get_event_loop()
 
     try:
+        # Generate audio directly in memory
+        audio_bytes = await generate_voice_in_memory(req.text)
+        
+        if not audio_bytes:
+            raise HTTPException(status_code=500, detail="Failed to generate audio")
+        
+        # Create generator for streaming
+        def audio_stream():
+            # Stream audio in chunks
+            chunk_size = 4096
+            for i in range(0, len(audio_bytes), chunk_size):
+                yield audio_bytes[i:i + chunk_size]
+        
+        return StreamingResponse(audio_stream(), media_type="audio/mpeg")
+        
+    except Exception as e:
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/speak-legacy")
+async def speak_legacy(req: SpeakRequest):
+    """Legacy endpoint that saves to disk (for compatibility)"""
+    os.makedirs(TMP_DIR, exist_ok=True)
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="Empty text")
+
+    loop = asyncio.get_event_loop()
+
+    try:
         audio_path = await loop.run_in_executor(executor, generate_voice_sync, req.text)
     except Exception as e:
         logger.exception(e)
@@ -225,13 +282,12 @@ if __name__ == "__main__":
     
     load_rvc()
 
-    print("BMO Voice Server Ready")
-    print("Testing local generation...")
-
-    test_text = "Who wants to play video games?"
-
-    out = generate_voice_sync(test_text)
-    print("Generated:", out)
+    logger.info("BMO Voice Server Ready")
+# Skip test generation due to network issues
+# logger.info("Testing local generation...")
+# test_text = "Hello, this is a test of the BMO voice server."
+# out = generate_voice_sync(test_text)
+# logger.info(f"Generated: {out}")
 
     print("Starting API server...")
     import uvicorn

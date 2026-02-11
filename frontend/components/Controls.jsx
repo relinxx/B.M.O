@@ -26,7 +26,11 @@ export function Controls() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
+      const preferredMimeType = 'audio/webm;codecs=opus'
+      const options = MediaRecorder.isTypeSupported(preferredMimeType)
+        ? { mimeType: preferredMimeType }
+        : undefined
+      const mediaRecorder = new MediaRecorder(stream, options)
       
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
@@ -36,7 +40,8 @@ export function Controls() {
       }
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
+        const mimeType = mediaRecorder.mimeType || 'audio/webm'
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
         await processAudio(audioBlob)
         stream.getTracks().forEach(track => track.stop())
       }

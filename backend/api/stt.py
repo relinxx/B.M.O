@@ -1,92 +1,80 @@
-import os
+import io
 import logging
-import tempfile
-try:
-    import whisper
-    WHISPER_AVAILABLE = True
-except ImportError:
-    WHISPER_AVAILABLE = False
-    logging.warning("Whisper not available, STT functionality disabled")
+import os
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
+
+try:
+    from openai import OpenAI
+except Exception:
+    OpenAI = None
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-class STTRequest(BaseModel):
-    audio_data: bytes  # Base64 encoded audio data
 
 class STTResponse(BaseModel):
     text: str
     confidence: float
-    language: str
 
-# Load Whisper model (will download on first run)
-whisper_model = None
-if WHISPER_AVAILABLE:
-    try:
-        whisper_model = whisper.load_model("base")
-        logger.info("Whisper model loaded successfully")
-    except Exception as e:
-        logger.error(f"Failed to load Whisper model: {str(e)}")
-        WHISPER_AVAILABLE = False
 
-@router.post("/stt", response_model=STTResponse)
+def _get_openai_client() -> "OpenAI":
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not set")
+    if OpenAI is None:
+        raise HTTPException(status_code=503, detail="openai package is not available")
+    return OpenAI(api_key=api_key)
+
+
+@router.post("/stt")
 async def speech_to_text(audio_file: UploadFile = File(...)):
-    """
-    Convert speech to text using Whisper
-    """
-    if not WHISPER_AVAILABLE or whisper_model is None:
-        raise HTTPException(
-            status_code=503, 
-            detail="Speech-to-text service not available"
-        )
-    
+    """Convert speech to text using OpenAI transcription."""
     try:
-        # Save uploaded audio to temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-            content = await audio_file.read()
-            temp_file.write(content)
-            temp_file_path = temp_file.name
-        
-        try:
-            # Transcribe audio using Whisper
-            result = whisper_model.transcribe(temp_file_path)
-            
-            text = result.get("text", "").strip()
-            language = result.get("language", "en")
-            
-            if not text:
-                return STTResponse(
-                    text="",
-                    confidence=0.0,
-                    language=language
-                )
-            
-            # Calculate confidence (Whisper doesn't provide direct confidence, so we'll use a simple heuristic)
-            confidence = min(1.0, len(text.split()) / 10.0)  # Simple confidence based on text length
-            
-            return STTResponse(
-                text=text,
-                confidence=confidence,
-                language=language
-            )
-            
-        finally:
-            # Clean up temporary file
-            os.unlink(temp_file_path)
-            
+        audio_bytes = await audio_file.read()
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="Empty audio file")
+
+        filename = audio_file.filename or "recording.webm"
+        content_type = audio_file.content_type or "application/octet-stream"
+        logger.info(
+            f"Received audio file: {filename}, type: {content_type}, size: {len(audio_bytes)} bytes"
+        )
+
+        client = _get_openai_client()
+
+        file_obj = io.BytesIO(audio_bytes)
+        file_obj.name = filename
+
+        result = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=file_obj,
+        )
+
+        text = (getattr(result, "text", None) or "").strip()
+        if not text:
+            return STTResponse(text="", confidence=0.0)
+
+        return STTResponse(text=text, confidence=1.0)
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in speech-to-text: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to transcribe audio")
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail=f"Speech-to-text failed: {str(e)}")
+
+@router.post("/stt/upload")
+async def speech_to_text_upload(file: UploadFile = File(...)):
+    """
+    Convert speech to text from uploaded audio file
+    """
+    return await speech_to_text(file)
 
 @router.get("/stt/health")
 async def stt_health():
     """
-    Check if STT service is available
+    Check STT service health
     """
-    if not WHISPER_AVAILABLE or whisper_model is None:
-        return {"status": "unavailable", "message": "Whisper model not loaded"}
-    
-    return {"status": "available", "message": "Speech-to-text service is ready"}
+    return {"status": "healthy", "service": "speech-to-text", "provider": "openai"}

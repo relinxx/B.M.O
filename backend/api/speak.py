@@ -17,51 +17,58 @@ class SpeakResponse(BaseModel):
     message: str
     audio_url: Optional[str] = None
 
-@router.post("/speak")
-async def speak(request: SpeakRequest):
+VOICE_SERVER_URL = os.getenv("VOICE_SERVER_URL", "http://localhost:8000")
+
+async def synthesize_speech(text: str) -> bytes:
     """
-    Convert text to speech using RVC voice server
+    Generate speech using voice server with in-memory audio generation
     """
     try:
-        voice_server_url = os.getenv("VOICE_SERVER_URL", "http://localhost:8000")
-        
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"{voice_server_url}/speak",
-                json={"text": request.text},
+                f"{VOICE_SERVER_URL}/speak",
+                json={"text": text},
                 headers={"Content-Type": "application/json"}
             )
             
-            if response.status_code != 200:
-                logger.error(f"Voice server error: {response.status_code} - {response.text}")
-                raise HTTPException(
-                    status_code=503, 
-                    detail="Voice server unavailable"
-                )
-            
-            # Stream the audio response back to the client
-            def audio_stream():
-                for chunk in response.iter_bytes(chunk_size=4096):
-                    if chunk:
-                        yield chunk
-            
-            return StreamingResponse(
-                audio_stream(),
-                media_type="audio/wav",
-                headers={
-                    "Content-Disposition": f"attachment; filename=bmo_speech.wav"
-                }
-            )
+            if response.status_code == 200:
+                return response.content
+            else:
+                raise Exception(f"Voice server error: {response.status_code}")
+                
+    except httpx.TimeoutException:
+        raise Exception("Voice server request timed out")
+    except Exception as e:
+        raise Exception(f"Failed to synthesize speech: {str(e)}")
+
+@router.post("/speak")
+async def speak(request: SpeakRequest):
+    """
+    Convert text to speech using voice server with in-memory audio generation
+    """
+    try:
+        audio_content = await synthesize_speech(request.text)
+        
+        return StreamingResponse(
+            iter([audio_content]),
+            media_type="audio/mpeg",  # Use audio/mpeg for MP3
+            headers={
+                "Content-Disposition": f"attachment; filename=bmo_speech.mp3"
+            }
+        )
             
     except httpx.ConnectError:
         logger.error("Cannot connect to voice server")
         raise HTTPException(
             status_code=503,
-            detail="Voice server is not running. Please start the BMO voice server."
+            detail="Voice server is not running. Please start to BMO voice server."
         )
     except Exception as e:
-        logger.error(f"Error in speak endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to generate speech")
+        logger.error(f"Speech synthesis error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate speech: {str(e)}"
+        )
 
 @router.get("/speak/health", response_model=SpeakResponse)
 async def speak_health():

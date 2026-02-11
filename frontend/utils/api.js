@@ -50,7 +50,7 @@ export const api = {
   // Speech-to-Text
   async speechToText(audioBlob) {
     const formData = new FormData()
-    formData.append('audio_file', audioBlob, 'recording.wav')
+    formData.append('audio_file', audioBlob, 'recording.webm')
 
     const response = await fetchWithTimeout(`${API_BASE_URL}/stt`, {
       method: 'POST',
